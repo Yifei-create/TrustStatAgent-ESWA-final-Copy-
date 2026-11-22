@@ -196,7 +196,7 @@ The first module translates a natural-language request into an executable analys
 Figure~\ref{fig:planning_execution} illustrates this
 workflow using a house-value prediction request.
 
-\begin{figure}[H]
+\begin{figure}[!tb]
     \centering
     \includegraphics[width=\linewidth]{figures/sci1.png}
     \caption{LLM task planning and statistical tool execution. \textcolor{blue}{It shows how a natural-language request becomes a structured plan and a sequence of authorized tool calls, using a house-value prediction request as the running example.}}
@@ -863,7 +863,7 @@ A lead at one release rate could reflect a fortunate threshold rather than a bet
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.74\linewidth]{figures/fig1_rc_curves.pdf}
+    \includegraphics[width=0.68\linewidth]{figures/fig1_rc_curves.pdf}
     \caption{\textcolor{blue}{Risk--coverage curves; lower is better everywhere.}}
     \label{fig:rc_curves}
 \end{figure}
@@ -1016,7 +1016,7 @@ The main experiments use GPT-6.1-sol. To check that \textcolor{red}{the framewor
     \end{tabular}}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!tb]
     \centering
     \includegraphics[width=0.9\linewidth]{figures/fig5_multillm.pdf}
     \caption{\textcolor{red}{Risk--coverage curves on StatQA across the four backbones (mean over three seeds; shading: s.d.). Dashed line: the 60\% release target reported in Table~\ref{tab:multillm}.}}
@@ -1140,7 +1140,7 @@ The counts correspond to the reference seed 42 at each policy's natural operatin
 The true labels enter only after every release decision has been fixed, to score the decisions; they are never available to the gate itself.
 }
 
-\begin{table}[H]
+\begin{table}[!tb]
     \centering
     \caption{\textcolor{blue}{Raw confusion counts on the test partitions at the reference seed, each policy at its natural operating point. StatQA has 464 test items, Covertype 20{,}000, California Housing 4{,}128, and Power Price 5{,}200.}}
     \label{tab:raw_counts}
