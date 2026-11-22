@@ -3,8 +3,8 @@
 %  Target journal: Expert Systems with Applications (Elsevier)
 %  Style: \bibliographystyle{elsarticle-harv}   (author--year / Harvard)
 %
-%  22 条，与 introduction.tex 中的 \citep / \citet 键一一对应。
-%  DOI 已逐条核实（2026-10-13）。
+%  与全文 \citep / \citet 键一一对应（2026-11-22 复核：正文引用 40 键）。
+%  DOI 已逐条核实（2026-11-22）。
 %
 %  符号说明：
 %   - 花括号保护：{CO}$_2$、{ConU}、{ReAct}、{Monitor} 等用于防止 .bst
@@ -28,14 +28,6 @@
 % ---------------------------------------------------------------------
 % B
 % ---------------------------------------------------------------------
-
-@misc{becker1996adult,
-  author       = {Becker, Barry and Kohavi, Ronny},
-  title        = {Adult [Dataset]},
-  howpublished = {UCI Machine Learning Repository},
-  year         = {1996},
-  doi          = {10.24432/C5XW20}
-}
 
 % ---------------------------------------------------------------------
 % C
@@ -150,16 +142,6 @@
   pages   = {1094--1111},
   year    = {2018},
   doi     = {10.1080/01621459.2017.1307116}
-}
-
-@article{liu2020carbon,
-  author  = {Liu, Zhu and Ciais, Philippe and Deng, Zhu and Davis, Steven J. and Zheng, Bo and others},
-  title   = {Carbon {Monitor}, a near-real-time daily dataset of global {CO}$_2$ emission from fossil fuel and cement production},
-  journal = {Scientific Data},
-  volume  = {7},
-  pages   = {392},
-  year    = {2020},
-  doi     = {10.1038/s41597-020-00708-7}
 }
 
 % ---------------------------------------------------------------------
@@ -352,7 +334,7 @@
 }
 
 @article{heo2025halucheck,
-  author = {Heo, S. and Son, S. and Park, H.},
+  author = {Heo, Sangwoo and Son, Sungwook and Park, Hyunwoo},
   title = {{HaluCheck}: Explainable and Verifiable Automation for Detecting Hallucinations in {LLM} Responses},
   journal = {Expert Systems with Applications},
   volume = {272},
@@ -466,4 +448,73 @@
   pages   = {1605--1641},
   year    = {2010},
   url     = {https://jmlr.org/papers/v11/el-yaniv10a.html}
+}
+
+% ---------------------------------------------------------------------
+% Added for the revised experimental sections
+% ---------------------------------------------------------------------
+
+@article{chow1970optimum,
+  author  = {Chow, C. K.},
+  title   = {On optimum recognition error and reject tradeoff},
+  journal = {IEEE Transactions on Information Theory},
+  volume  = {16},
+  number  = {1},
+  pages   = {41--46},
+  year    = {1970},
+  doi     = {10.1109/TIT.1970.1054406}
+}
+
+@inproceedings{gibbs2021adaptive,
+  author    = {Gibbs, Isaac and Cand{\`e}s, Emmanuel},
+  title     = {Adaptive conformal inference under distribution shift},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {34},
+  pages     = {1660--1672},
+  year      = {2021}
+}
+
+@article{blackard1999comparative,
+  author  = {Blackard, Jock A. and Dean, Denis J.},
+  title   = {Comparative accuracies of artificial neural networks and discriminant analysis in predicting forest cover types from cartographic variables},
+  journal = {Computers and Electronics in Agriculture},
+  volume  = {24},
+  number  = {3},
+  pages   = {131--151},
+  year    = {1999},
+  doi     = {10.1016/S0168-1699(99)00046-0}
+}
+
+@misc{energycharts2025,
+  author       = {{Fraunhofer Institute for Solar Energy Systems ISE}},
+  title        = {Energy-Charts: Day-ahead spot market prices, {Germany--Luxembourg} bidding zone},
+  howpublished = {\url{https://energy-charts.info/}},
+  year         = {2025},
+  note         = {Accessed 2025}
+}
+
+@book{vovk2005algorithmic,
+  author    = {Vovk, Vladimir and Gammerman, Alexander and Shafer, Glenn},
+  title     = {Algorithmic Learning in a Random World},
+  publisher = {Springer},
+  year      = {2005},
+  doi       = {10.1007/b106715}
+}
+
+@book{efron1993introduction,
+  author    = {Efron, Bradley and Tibshirani, Robert J.},
+  title     = {An Introduction to the Bootstrap},
+  publisher = {Chapman \& Hall/CRC},
+  address   = {Boca Raton, FL},
+  year      = {1993}
+}
+
+@incollection{politis1992circular,
+  author    = {Politis, Dimitris N. and Romano, Joseph P.},
+  title     = {A circular block-resampling procedure for stationary data},
+  booktitle = {Exploring the Limits of Bootstrap},
+  editor    = {LePage, Raoul and Billard, Lynne},
+  pages     = {263--270},
+  publisher = {Wiley},
+  year      = {1992}
 }
