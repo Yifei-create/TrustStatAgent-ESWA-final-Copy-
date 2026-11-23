@@ -84,9 +84,11 @@
 
 %% Abstract
 \begin{abstract}
+
 {\color{blue}
-Delegating statistical analysis to large language model (LLM) agents is attractive because the work is repetitive and tool-heavy, but an erroneous result is consumed downstream as a fact, and existing pipelines leave the release decision to the user or to a confidence threshold with no finite-sample guarantee. This paper presents TrustStatAgent: an LLM plans the analysis and routes every computation through statistical tools, conformal calibration turns each candidate into an interval or label set with finite-sample coverage, and a deterministic risk gate releases a result only when its execution checks pass and its calibrated output lies inside the task's acceptance region, referring the rest to human review. On four benchmarks spanning question answering, classification, regression and day-ahead forecasting, the gate cuts the released error rate against unrestricted publication by at least three quarters on most of them, and attains a risk--coverage profile that is the lowest or statistically indistinguishable from the lowest throughout, while every released result carries a 90\% coverage certificate. The gain is not free: part of the workload is referred for review, and the release rate accompanies every reliability figure, so the exchange can be weighed against deployment costs.
+Delegating statistical analysis to large language model (LLM) agents is attractive, but an erroneous result is consumed downstream as a fact, and existing pipelines leave the release decision to the user or to a confidence threshold with no finite-sample guarantee. This paper presents TrustStatAgent, which separates result generation from result release. An LLM plans each analysis and routes every computation through statistical tools, conformal calibration attaches a finite-sample coverage certificate to every candidate, and a deterministic risk gate publishes a result only when execution checks pass and its fused risk score, built from calibrated uncertainty signals, clears the release threshold. On four benchmarks spanning question answering, classification, regression and day-ahead forecasting, the gate cuts the released error rate against unrestricted publication by at least three quarters on most of them, attains a risk--coverage profile that is the lowest or statistically indistinguishable from the lowest throughout, and transfers unchanged across four language-model backbones, while every released result carries a 90\% coverage certificate. Part of the workload is referred for review, and the release rate accompanies every reliability figure, so the exchange can be weighed against deployment costs.
 }
+
 \end{abstract}
 
 %%Graphical abstract
@@ -96,11 +98,11 @@ Delegating statistical analysis to large language model (LLM) agents is attracti
 
 %%Research highlights
 \begin{highlights}
-\item {\color{blue}An LLM statistical agent that decides not only what to compute but what to publish}
-\item {\color{blue}The agent plans the analysis and selects methods; tools do all the arithmetic}
-\item {\color{blue}Conformal calibration gives every released result a finite-sample coverage guarantee}
-\item {\color{blue}A risk gate publishes a result only when execution and uncertainty checks pass}
-\item {\color{blue}Released error falls from 43.0\% to \textcolor{red}{10.1}\% on StatQA and \textcolor{red}{to} 1.9\% on Covertype}
+\item An LLM statistical agent that decides not only what to compute but what to publish
+\item The agent plans the analysis and selects methods; tools do all the arithmetic
+\item Conformal calibration gives every released result a finite-sample coverage guarantee
+\item \textcolor{blue}{A risk gate publishes a result only when execution checks pass and its fused risk score clears the release threshold}
+\item Released error falls from 43.0\% to 10.1\% on StatQA and to 1.9\% on Covertype
 \end{highlights}
 
 %% Keywords
@@ -116,34 +118,32 @@ Large language model agents \sep Conformal prediction \sep Risk gating
 
 
 
-Large language models (LLMs) are increasingly deployed as the reasoning core of expert systems. This shift rests on two capabilities. The first is reasoning. Chain-of-thought prompting decomposes a difficult problem into intermediate steps and markedly improves arithmetic and symbolic inference~\citep{wei2022chain}, a behaviour that can be triggered without demonstrations~\citep{kojima2022large} and stabilised by sampling and voting~\citep{wang2023self}. The second is acting. ReAct interleaves reasoning traces with calls to external tools~\citep{yao2023react}, and Toolformer shows that the decision of when to invoke an interface can be learned~\citep{schick2023toolformer}.
+{\color{blue}
+Large language models (LLMs) increasingly serve as the reasoning core of expert systems, decomposing problems into intermediate steps~\citep{wei2022chain,kojima2022large,wang2023self} and acting through external tools~\citep{yao2023react,schick2023toolformer}. Statistical analysis is among the most attractive delegations, because fitting models, selecting estimators and reporting intervals is repetitive and tool-heavy~\citep{sun2026survey}. The arithmetic can be delegated to deterministic tools, but the judgement surrounding it cannot: on StatQA, a benchmark of 11{,}623 statistical-analysis items, the strongest model attains only 64.83\% accuracy, and its errors are dominated by method applicability rather than computation~\citep{zhu2024large}. Such judgement is also where language models are least reliable, since they generate content unfaithful to the available evidence and their confidence signals are poorly calibrated~\citep{ji2023survey,guo2017calibration,kadavath2022language}. Within a statistical pipeline these failures are silent: a misspecified model or an interval that fails to cover its target is consumed downstream as a fact. An autonomous statistical agent must therefore decide, for each result, whether that result is safe to release.
 
-Statistical analysis is among the domains in which this capability matters most, because the work involved, such as fitting models, selecting estimators and reporting intervals, is repetitive and tool-heavy. Interest in delegating such work to LLM-based data agents has therefore grown rapidly~\citep{sun2026survey}. Systematic evaluation nevertheless indicates that the capability gap remains wide. On StatQA, a benchmark of 11{,}623 statistical-analysis items, the strongest model attains only 64.83\% accuracy, and its errors are dominated by method applicability rather than computation~\citep{zhu2024large}. The bottleneck is therefore not arithmetic, which can be delegated to deterministic tools, but the judgement surrounding it.
+Existing work addresses parts of this requirement from separate directions. Reliability mechanisms for language-model outputs, including the verification and multi-agent schemes of the expert-systems community~\citep{shi2025mitigating,he2026enhancing}, remain heuristic and carry no statistical guarantee. Conformal prediction offers the missing guarantee, constructing prediction sets with finite-sample coverage that remains valid under a misspecified model~\citep{lei2018distribution,angelopoulos2023gentle,angelopoulos2024conformal}, and it has reached language-model outputs~\citep{campos2024conformal,wang2024conu,cherian2024large}; its concern, however, is the coverage of a set rather than the decision to publish. Selective prediction makes exactly that decision, abstaining where a target risk cannot be met~\citep{chow1970optimum,elyaniv2010foundations,geifman2017selective,geifman2019selectivenet}, but its rules rank candidates by a single confidence score whose scale is model-specific and which ignores complementary evidence about failure.
 
-That judgement is also where the reliability of LLMs is weakest. LLMs generate content unfaithful to the available evidence~\citep{ji2023survey}, and their confidence signals are poorly calibrated~\citep{guo2017calibration,kadavath2022language}. Within a statistical pipeline such failures are not merely textual. A misspecified model or an interval that does not cover the quantity it claims to cover is consumed downstream as a fact, and the error is silent. An autonomous statistical agent must therefore decide, for each result, whether that result is safe to release.
+Three gaps follow. The release authority is still held by the generator's own self-report or left to the user. The certificate is decoupled from the execution of the analysis, so a coverage statement can accompany a computation that never ran as planned. And no single-signal rule serves heterogeneous tasks, while a reliability metric reported alone can be satisfied by releasing nothing, so statistical accuracy and publishing reliability must be pursued and reported jointly.
 
-Making this requirement precise exposes a difficulty. If reliability is measured as the proportion of released results that are correct, an agent that releases nothing attains a perfect score while completing none of the workload. Reliability is therefore informative only when reported jointly with the fraction of tasks the agent publishes. The objective adopted here is accordingly the joint attainment of statistical accuracy and publishing reliability, which raises three questions. Can a tool-restricted agent match uncalibrated baselines on heterogeneous tasks? Can conformal prediction convert its heuristic uncertainty into statements with finite-sample validity? And does a risk gate discriminate publishable from non-publishable results better than a threshold tuned once on validation data?
+We address these gaps with TrustStatAgent, an architecture that separates result generation from result release. An LLM plans each analysis and routes every computation through authorized statistical tools, which return inspectable execution records. Conformal calibration then serves the release decision twice, attaching a finite-sample coverage certificate to every candidate and supplying calibrated uncertainty signals that are comparable across task families. A deterministic risk gate fuses these signals into a single risk ranking and publishes a result only when its execution record is compliant and its risk score clears a threshold fixed on validation data under a pre-registered release band; everything else is referred to human review. Because the errors of a statistical pipeline scatter across failure modes that no single signal covers, fusion is what allows one release rule to serve question answering, classification, regression and forecasting alike.
 
-An uncertainty layer is the first requirement. Confidence scores are model-specific and carry no finite-sample statement about the quantity of interest. Conformal prediction provides one: it is model-agnostic and distribution-free, and it constructs prediction sets with non-asymptotic coverage guarantees that remain valid under a misspecified model~\citep{lei2018distribution,angelopoulos2023gentle}, with recent extensions controlling the expectation of arbitrary monotone losses~\citep{angelopoulos2024conformal}. Conformal methods have accordingly reached natural language processing~\citep{campos2024conformal,wang2024conu,cherian2024large}. What remains missing is their coupling to the execution of the analysis.
-
-A second requirement concerns how uncertainty becomes an action. Selective prediction formalises the trade-off between coverage and risk and allows a model to abstain where a target risk cannot be met~\citep{geifman2017selective}. In conventional deployments, including the baseline used here, the rejection threshold is tuned once on a validation set and then frozen, which provides no guarantee on the test distribution. Deriving it instead from a quantile of calibration scores lets the decision rule inherit that guarantee. Reliability mechanisms for LLM agents have also attracted attention in the expert-systems community~\citep{shi2025mitigating,he2026enhancing}. The present work supplies a statistical guarantee rather than a consensus heuristic, and attaches it to the decision to publish.
-
-To address these issues, this paper proposes TrustStatAgent, a statistical agent that combines three components. The first is an LLM acting as a planning brain: given a task specification and a restricted toolset for data inspection, model fitting and prediction, it identifies the target variable, the candidate inputs and the task type, emits a structured plan, and routes every numerical computation through the tools. Its instructions forbid fabricated results and forbid the model from deciding whether its own output may be released. The second is conformal calibration, which uses the $\lceil (n+1)(1-\alpha)\rceil$-th smallest nonconformity score on a held-out split to turn point forecasts into intervals and probabilistic label sets into prediction sets. The third is a risk gate, which publishes a result only when its conformal output is valid and a deterministic execution check passes, and defers all other cases to human review.
+On four benchmarks spanning these four task families, the gate cuts the released error rate against unrestricted publication by at least three quarters on most of them and attains a risk--coverage profile that is the lowest or statistically indistinguishable from the lowest throughout, while every released result carries a 90\% coverage certificate; the release layer itself makes no language-model calls and transfers unchanged across four backbones.
 
 In summary, the main contributions of this paper are as follows:
 \begin{itemize}
-  \item We formulate the deployment of LLM-based statistical agents as a joint objective of statistical accuracy and publishing reliability, and we make explicit the evaluation trap whereby a reliability-only criterion can be satisfied through excessive abstention.
-  \item We propose TrustStatAgent, which couples tool-grounded execution checking with conformally calibrated uncertainty and a conformal risk gate within a single workflow, separating result generation from result release at the architectural level.
-  \item We replace the validation-tuned rejection threshold with a conformally calibrated risk gate, and compare the two directly in their ability to discriminate publishable from non-publishable results.
-  \item {\color{blue}We evaluate the framework on four heterogeneous statistical tasks, namely statistical question answering on StatQA~\citep{zhu2024large}, seven-class classification on Covertype~\citep{blackard1999comparative}, regression on California Housing~\citep{pace1997sparse} and day-ahead price forecasting on Energy-Charts data~\citep{energycharts2025}, and we isolate the contribution of explicit planning, conformal calibration and risk gating through targeted ablations.}
+  \item We formulate the deployment of LLM-based statistical agents as a release-control problem and propose TrustStatAgent, an architecture that separates result generation from result release: an LLM plans each analysis, authorized tools perform every computation, conformal calibration certifies every candidate, and a deterministic risk gate holds the sole authority to publish.
+  \item Existing release rules rank candidates by a single signal, whereas the errors of a statistical pipeline scatter across failure modes. We fuse the calibrated uncertainty signals of each candidate into one risk ranking, giving a single release rule that serves all four task families.
+  \item We make explicit the evaluation trap whereby a reliability-only criterion can be satisfied through excessive abstention, and we compare release rules under a matched-release protocol that fixes every rule at an identical level of automation, so that gating methods are judged by the quality of their ranking rather than by the choice of threshold.
+  \item We evaluate the framework on four heterogeneous benchmarks, namely statistical question answering on StatQA~\citep{zhu2024large}, classification on Covertype~\citep{blackard1999comparative}, regression on California Housing~\citep{pace1997sparse} and day-ahead price forecasting on Energy-Charts data~\citep{energycharts2025}, with targeted ablations and a four-backbone replication; the gate cuts the released error rate by at least three quarters on most benchmarks and attains the lowest or statistically indistinguishable risk--coverage area throughout.
 \end{itemize}
+}
 
 %This paper is organized as follows. Section~2 reviews related work on LLM agents, uncertainty quantification and selective prediction. Section~3 presents the TrustStatAgent framework. Section~4 describes the datasets, baselines and evaluation metrics. Section~5 reports and discusses the experimental results. Section~6 concludes the paper and outlines directions for future work.
 
 \section{Related Work}
 \subsection{Large language model agents for statistical analysis}
 \label{subsec:statistical_agents}
-Large language models (LLMs) offer a new interface for data analysis through natural language. Users can describe an analytical task, and the model can identify relevant variables, organize the required steps,and invoke external tools to perform computations. In this workflow, the LLM interprets the task and plans the analysis, while statistical tools perform numerical computations and execute models. ReAct interleaves reasoning and actions so that models can adjust their task trajectories using external feedback~\citep{yao2023react}.Data Interpreter extends this approach to multistage data analysis by representing task dependencies as a graph and incorporating iterative verification and correction~\citep{hong2025data}.These studies provide a foundation for translating natural language requests into executable workflows.
+Large language models (LLMs) offer a new interface for data analysis through natural language. Users can describe an analytical task, and the model can identify relevant variables, organize the required steps, and invoke external tools to perform computations. In this workflow, the LLM interprets the task and plans the analysis, while statistical tools perform numerical computations and execute models. ReAct interleaves reasoning and actions so that models can adjust their task trajectories using external feedback~\citep{yao2023react}. Data Interpreter extends this approach to multistage data analysis by representing task dependencies as a graph and incorporating iterative verification and correction~\citep{hong2025data}. These studies provide a foundation for translating natural language requests into executable workflows.
 
 Statistical analysis imposes explicit constraints on variable definitions, data types, and the applicability of methods. Consequently, a computation that returns successfully does not establish that the analytical choices were appropriate. StatQA evaluates the joint selection of relevant variables and applicable statistical methods and identifies limitations in LLMs' assessment of method applicability~\citep{zhu2024large}. Evaluating a statistical agent therefore requires distinguishing task interpretation, method selection, and tool execution. 
 
@@ -171,7 +171,7 @@ This section describes TrustStatAgent, a workflow for deciding when statistical 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\linewidth]{figures/sci4.png}
-    \caption{Overall architecture of TrustStatAgent. Solid arrows indicate task data and execution evidence, while dashed arrows represent calibration and release configurations. Computation, calibration, and gating are fully automated. Human review is required only for execution failures or missing conformal outputs. Calibration labels are isolated from the LLM, and test labels are strictly for evaluation.}
+    \caption{Overall architecture of TrustStatAgent.}
     \label{fig:framework}
 \end{figure}
 
@@ -182,24 +182,24 @@ TrustStatAgent separates task planning and statistical execution, uncertainty ca
 \begin{equation}
     (R,\mathcal{L})=\mathcal{A}_{\theta}(\mathcal{T};\mathcal{F}),\qquad
     C=\mathcal{Q}_{\alpha}(R;\mathcal{D}_{\mathrm{cal}}),\qquad
-    g=\mathcal{G}_{\tau}(R,C,\mathcal{L};\Omega),
+    g=\mathcal{G}_{\tau}(R,C,\mathcal{L}),
     \label{eq:framework}
 \end{equation}
-where $\theta$ denotes the language-model configuration, $\tau$ is the task type, $\alpha$ is the nominal miscoverage level, and $\Omega$ contains task-specific acceptance criteria. The LLM interprets the request and specifies the analysis; authorized programs perform numerical computation and retain execution evidence. A result is released only when its calibrated output and execution status meet the prespecified criteria. {\color{blue}Together, the calibration module and the risk gate form the release layer, which decides what the agent may publish.} We evaluate this design on three predictive tasks and one structured statistical question-answering task, with task-specific implementations described below.
+where $\theta$ denotes the language-model configuration, $\tau$ is the task type, $\alpha$ is the nominal miscoverage level, \textcolor{blue}{and $\Omega$, introduced in Section 3.4, collects the task-specific error criteria applied at evaluation}. The LLM interprets the request and specifies the analysis; authorized programs perform numerical computation and retain execution evidence. \textcolor{blue}{A result is released only when its execution record is compliant and its fused risk score clears the prespecified threshold.} Together, the calibration module and the risk gate form the release layer, which decides what the agent may publish. We evaluate this design on three predictive tasks and one structured statistical question-answering task, with task-specific implementations described below.
 
 \subsection{Task planning and statistical tool execution}
 \label{sec:execution}
 
 The first module translates a natural-language request into an executable analysis. Following the reasoning-and-action pattern of ReAct~\citep{yao2023react}, the LLM receives the user's request, descriptions of the available datasets, and specifications of the permitted statistical tools. It records a structured plan containing the task type, target, selected variables, method, preprocessing, and intended tool sequence. Explicit variable and method selection addresses a documented difficulty in statistical question answering~\citep{zhu2024large}. For numerical tasks, the LLM selects tools for data inspection, model fitting, prediction, or forecasting. Each requested tool call is checked against the permitted tool set and executed by the corresponding statistical procedure. The results are recorded and returned to the LLM to guide subsequent analysis.
 
-{\color{blue}Once produced by this pipeline, the candidates of each predictive task are frozen, so that every release rule evaluated later consumes the identical pool (Section~\ref{sec:evaluation_protocol}). The frozen pool is nevertheless the agent's own work: its method selection yields a random-forest classifier on Covertype, histogram gradient-boosting models for point and quantile predictions on California Housing, and ridge regression selected by chronological cross-validation on Power Price.} In StatQA, the LLM returns the selected columns and methods under an explicit plan, and the benchmark evaluates these analytical choices directly. Its answer correctness follows the benchmark criterion~\citep{zhu2024large}, while a separate TF--IDF logistic-regression scorer supplies the score used for calibration. The scorer is trained on a dedicated split, and reference answers are excluded from its input features.
+Once produced by this pipeline, the candidates of each predictive task are frozen, so that every release rule evaluated later consumes the identical pool (Section~\ref{sec:evaluation_protocol}). The frozen pool is nevertheless the agent's own work: its method selection yields a random-forest classifier on Covertype, histogram gradient-boosting models for point and quantile predictions on California Housing, and ridge regression selected by chronological cross-validation on Power Price. In StatQA, the LLM returns the selected columns and methods under an explicit plan, and the benchmark evaluates these analytical choices directly. Its answer correctness follows the benchmark criterion~\citep{zhu2024large}, while a separate TF--IDF logistic-regression scorer supplies the score used for calibration. The scorer is trained on a dedicated split, and reference answers are excluded from its input features.
 Figure~\ref{fig:planning_execution} illustrates this
 workflow using a house-value prediction request.
 
 \begin{figure}[!tb]
     \centering
     \includegraphics[width=\linewidth]{figures/sci1.png}
-    \caption{LLM task planning and statistical tool execution. \textcolor{blue}{It shows how a natural-language request becomes a structured plan and a sequence of authorized tool calls, using a house-value prediction request as the running example.}}
+    \caption{LLM task planning and statistical tool execution. It shows how a natural-language request becomes a structured plan and a sequence of authorized tool calls, using a house-value prediction request as the running example.}
     \label{fig:planning_execution}
 \end{figure}
 
@@ -209,7 +209,7 @@ For each candidate result, the calibration module constructs an interval or pred
 conformal prediction framework \citep{angelopoulos2023gentle}, the target
 is the response value for regression and forecasting, the class label
 for classification, and candidate correctness for statistical question
-answering. The resulting intervals and prediction sets are evaluated against the release criteria defined in Section 3.4 to determine whether each candidate result can be released automatically.
+answering. \textcolor{blue}{The resulting intervals and prediction sets accompany each candidate as coverage certificates and supply calibrated uncertainty signals to the release decision of Section~\ref{sec:risk_gating}.}
 
 Let \(R_i\) denote the candidate generated from observable inputs \(x_i\),
 and let \(T_i\) denote its calibration target. A nonconformity score
@@ -249,7 +249,7 @@ task-specific calibration procedures described below.
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{figures/sci2.png}
-    \caption{Task-specific conformal uncertainty calibration. \textcolor{blue}{It depicts the four task-specific procedures that turn held-out nonconformity scores into intervals or prediction sets.}}
+    \caption{Task-specific conformal uncertainty calibration. It depicts the four task-specific procedures that turn held-out nonconformity scores into intervals or prediction sets.}
     \label{fig:conformal_calibration}
 \end{figure}
 
@@ -280,12 +280,12 @@ task-specific calibration procedures described below.
     \end{equation}
     The adjustment preserves variation in the preliminary interval
     widths across inputs, while the nonnegative correction prevents
-    calibration from contracting the interval. The point prediction
-    is retained separately for the subsequent tolerance-based
-    release test.
+    calibration from contracting the interval. \textcolor{blue}{The point prediction
+    is retained separately for evaluation against the task's
+    tolerance-based error definition.}
 
     \item \textbf{Categorical prediction.}
-    For {\color{blue}Covertype}, the fitted classifier supplies class probabilities
+    For Covertype, the fitted classifier supplies class probabilities
     \(p(c\mid x_i)\). We use probability-threshold calibration
     \citep{angelopoulos2023gentle}, with scores
     \(s_i=1-p(y_i\mid x_i)\) and prediction sets
@@ -337,8 +337,8 @@ task-specific calibration procedures described below.
 
     \item \textbf{Temporal prediction.}
     Online conformal methods explicitly address sequential calibration
-    \citep{angelopoulos2024online}. For {\color{blue}Power Price}, we use a
-    chronological rolling-residual construction around the {\color{blue}day-ahead forecast selected by the task protocol}. At time \(t\), let
+    \citep{angelopoulos2024online}. For Power Price, we use a
+    chronological rolling-residual construction around the day-ahead forecast selected by the task protocol. At time \(t\), let
     \(\mathcal{W}_t\) index the most recent \(w\) forecasts whose
     outcomes have already been observed. Their scores are
     \begin{equation}
@@ -359,7 +359,7 @@ task-specific calibration procedures described below.
         \right].
         \label{eq:rolling_calibrated_interval}
     \end{equation}
-    {\color{blue}Because day-ahead prices settle with a delay, the window \(\mathcal{W}_t\) contains only forecasts whose outcomes were observed at least 24 hours before the forecast origin, so every score enters calibration after its outcome is known and never before.}
+    Because day-ahead prices settle with a delay, the window \(\mathcal{W}_t\) contains only forecasts whose outcomes were observed at least 24 hours before the forecast origin, so every score enters calibration after its outcome is known and never before.
 
 \end{itemize}
 
@@ -368,37 +368,61 @@ task-specific calibration procedures described below.
 \subsection{Risk gating and selective release}
 \label{sec:risk_gating}
 
+{\color{blue}
 The risk gate converts calibrated uncertainty into a decision about
 automatic release. Recent work on informative conformal prediction examines how
 prediction sets can be selected to meet application needs
 \cite{gazin2025selecting}, while conformal risk control uses
 specified loss functions to calibrate prediction rules
-\cite{angelopoulos2024conformal}. In our framework, the
-release criteria define which target values are acceptable.
-A candidate is eligible for automatic release only if every
-value or label in its calibrated set meets these criteria.
+\cite{angelopoulos2024conformal}. In our framework the gate
+ranks candidates by a fused risk score and releases the
+lower-risk tail.
 
-Let \(\mathcal{A}_{\Omega,i}\) denote the acceptable target set for
-candidate \(i\), with requirements \(\Omega\) fixed before test
-evaluation. Let \(H_i=1\) indicate an unresolved execution failure,
+Each candidate carries several uncertainty signals that expose
+distinct failure modes. Classification contributes the runner-up
+probability, the top-two margin, whether the conformal
+prediction set retains more than one class, and a learned
+error-probability estimate. Regression contributes the calibrated interval width
+and a learned error-scale estimate, and forecasting adds
+leakage-free rolling summaries of past residuals. On StatQA the
+calibrated correctness score of Section~\ref{sec:execution}
+plays this role. A logistic combiner over the ranked signals is
+fitted on the calibration split, and a pre-registered selection
+rule retains a signal only when it improves the ranking quality
+on the validation split, so the fused ranking is never worse
+than its best component. A single signal captures one failure
+mode at a time, whereas the errors of a statistical pipeline
+scatter across several, and the fused score is what lets one
+ordering serve four heterogeneous task families.
+
+Let \(H_i=1\) indicate an unresolved execution failure,
 and let \(V_i=1\) indicate an available, valid uncertainty output.
 Numerical intervals must have finite, ordered endpoints, while
 discrete sets must be nonempty and contain admissible labels.
-The release decision is
+Writing \(f_i\) for the fused risk score of candidate \(i\),
+the release decision is
 \begin{equation}
     g_i
     =
     \mathbf{1}\{H_i=0\}
     \mathbf{1}\{V_i=1\}
-    \mathbf{1}\{C_i\subseteq\mathcal{A}_{\Omega,i}\},
+    \mathbf{1}\{f_i\leq t\},
     \label{eq:unified_release_gate}
 \end{equation}
 where \(g_i=1\) denotes automatic release and \(g_i=0\) denotes referral.
-The validity condition excludes empty sets, whose mathematical
-containment in any acceptance set would otherwise permit release
-without supporting evidence.
+The threshold \(t\) is fixed on the validation split under a
+pre-registered rule that minimises the released error rate
+subject to an automatic-release fraction between 60\% and 85\%.
+For StatQA the score is a correctness score \(r_i\) with the
+orientation reversed, so the gate releases when \(r_i\geq t\).
+The validity condition excludes empty sets, whose calibrated
+content would otherwise offer no evidence for a release.}
 
-For numerical predictions, the acceptable target set is
+{\color{blue}
+The quality of a release is scored once the target is observed.
+Let \(\mathcal{A}_{\Omega,i}\) denote the acceptable target set for
+candidate \(i\), with requirements \(\Omega\) fixed before test
+evaluation. For numerical predictions the acceptable set is
 \begin{equation}
     \mathcal{A}_{\Omega,i}
     =
@@ -408,19 +432,20 @@ For numerical predictions, the acceptable target set is
     \right],
     \label{eq:numerical_acceptance_set}
 \end{equation}
-where \(\Delta>0\) specifies the permitted prediction error.
-Containment checks both interval endpoints relative to the point
-prediction. For categorical
-predictions, the acceptable set is the predicted-class singleton;
-for StatQA, it is the correctness label \(\{1\}\).
-Table~\ref{tab:calibrated_release_conditions} summarizes the
-resulting conditions.
-\textcolor{red}{For StatQA the release test thresholds the calibrated correctness score, \(g_i=1\) when \(r_i\geq\tau\); \(\tau\) is fixed on the validation split under the same pre-registered release-band rule as the other benchmarks, targeting roughly 60\% automatic release, and the prediction set \(C_i\) still accompanies every candidate as its coverage certificate.}
+where \(\Delta>0\) is a validation-selected tolerance in the
+target unit. For categorical predictions the acceptable set is
+the predicted-class singleton, and for StatQA it is the
+correctness label \(\{1\}\). A released candidate with
+\(T_i\notin\mathcal{A}_{\Omega,i}\) counts as a released error.
+These criteria require the observed target and enter only at
+evaluation, where they define the released error rate of
+Section~\ref{sec:experimental_setup}.
+Table~\ref{tab:calibrated_release_conditions} summarises the
+release conditions of the four output types.}
 
 \begin{table}[t]
     \centering
-    \caption{Automatic-release conditions. All conditions additionally
-    require successful execution and a valid uncertainty output.}
+    \caption{\textcolor{blue}{Automatic-release conditions. All conditions additionally require successful execution and a valid uncertainty output; every threshold is fixed on the validation split.}}
     \label{tab:calibrated_release_conditions}
     \small
     \renewcommand{\arraystretch}{1.2}
@@ -433,60 +458,42 @@ resulting conditions.
 
         Regression
         & \([L_i,U_i]\)
-        & \(L_i\geq\widehat y_i-\Delta\), \(U_i\leq\widehat y_i+\Delta\) \\
+        & \textcolor{blue}{Fused risk \(f_i\leq t\)} \\
 
         Classification
         & Class set \(C_i\)
-        & \textcolor{red}{\(\widehat p(\widehat y_i\mid x_i)\geq\tau\), \(\tau\) fixed on validation} \\
+        & \textcolor{blue}{Fused risk \(f_i\leq t\)} \\
 
         Statistical QA
         & Correctness set \(C_i\)
-        & \textcolor{red}{\(r_i\geq\tau\), \(\tau\) fixed on validation} \\
+        & \textcolor{blue}{Correctness score \(r_i\geq t\)} \\
 
         Forecasting
         & \(\widehat y_t\pm q_{\alpha,t}\)
-        & \(q_{\alpha,t}\leq\Delta\) \\
+        & \textcolor{blue}{Fused risk \(f_t\leq t\)} \\
 
         \bottomrule
     \end{tabular}
 \end{table}
 
-The gate automatically releases a candidate when execution
-succeeds, the uncertainty output is valid, and the acceptance
-criterion is satisfied. All remaining candidates are referred
-for review.
-Figure~\ref{fig:risk_gating} illustrates the checks,
-acceptance tests, and routing decisions of the risk gate.
+Figure~\ref{fig:risk_gating} illustrates \textcolor{blue}{these checks, the thresholding on the fused risk score, and the routing of each candidate}.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{figures/sci3.png}
-    \caption{Risk gating and selective release. \textcolor{blue}{It depicts the checks, acceptance tests, and routing decisions that turn a calibrated output into a release or a referral.}}
+    \caption{Risk gating and selective release. \textcolor{blue}{It depicts the execution checks, the fused-score thresholding, and the routing decisions behind each release or referral.}}
     \label{fig:risk_gating}
 \end{figure}
-\textcolor{red}{For the interval- and set-valued outputs, the} containment rule also clarifies the connection between calibration
-and release. If \(g_i=1\), then
-\(C_i\subseteq\mathcal{A}_{\Omega,i}\); therefore,
-\begin{equation}
-    \left\{
-        g_i=1,\;
-        T_i\notin\mathcal{A}_{\Omega,i}
-    \right\}
-    \subseteq
-    \left\{
-        T_i\notin C_i
-    \right\}.
-    \label{eq:release_violation_inclusion}
-\end{equation}
-Thus, whenever a released result violates the acceptance
-criterion, the true target lies outside the calibrated set.
-A valid upper bound on marginal miscoverage therefore also
-bounds the probability of a release error. The error rate
-among released results requires separate evaluation because
-it is calculated within the subset selected by the gate
+{\color{blue}
+The calibrated output accompanies every released result as a
+coverage certificate, so a user receives both the answer and a
+finite-sample statement about the target it concerns. The
+coverage guarantee holds marginally over all candidates, and
+the error rate among released results is evaluated separately
+because it is calculated within the subset selected by the gate
 \citep{jin2025confidence}. We therefore report empirical
 coverage, release rate, and error rate among released
-candidates together.
+candidates together.}
 
 
 \section{Experimental Setup}
@@ -495,66 +502,60 @@ candidates together.
 \subsection{Benchmark tasks and datasets}
 \label{sec:benchmark_tasks}
 
-{\color{blue}
+
 Four benchmarks cover the four output types a statistical agent produces in practice, namely a structured analytical answer, a class label, a point prediction, and a day-ahead price forecast.
 Table~\ref{tab:benchmark_tasks} summarises their roles.
-The acceptance rule in the last column defines what counts as an error for the release decision, and everything the gate lets through must satisfy it.
-}
+\textcolor{blue}{The acceptance rule in the last column defines what counts as an error when a released result is scored against its observed target.}
+
 
 \begin{table}[H]
     \centering
-    \caption{\textcolor{blue}{Benchmark tasks. The acceptance rule defines an error for the release decision; $\Delta$ is a validation-selected tolerance in the dataset's target unit.}}
+    \caption{Benchmark tasks. The acceptance rule \textcolor{blue}{defines what counts as an error at evaluation}; $\Delta$ is a validation-selected tolerance in the dataset's target unit.}
     \label{tab:benchmark_tasks}
-    \small\color{blue}
+    \small
     \setlength{\tabcolsep}{4pt}
     \renewcommand{\arraystretch}{1.2}
     \begin{tabularx}{\linewidth}{
         @{}
         l
-        >{\raggedright\arraybackslash}p{0.15\linewidth}
+        >{\raggedright\arraybackslash}p{0.18\linewidth}
         >{\raggedright\arraybackslash}X
-        >{\raggedright\arraybackslash}p{0.20\linewidth}
-        >{\raggedright\arraybackslash}p{0.16\linewidth}
+        >{\raggedright\arraybackslash}p{0.22\linewidth}
         @{}
     }
         \toprule
         \textbf{Benchmark}
         & \textbf{Task}
         & \textbf{Candidate output}
-        & \textbf{Calibrated output}
         & \textbf{Acceptance rule} \\
         \midrule
         StatQA
         & Statistical analysis QA
         & Variable and method selection with the computed answer
-        & Calibrated correctness score
         & Official correctness criterion \\
 
         Covertype
         & 7-class classification
         & Predicted class with class probabilities
-        & Conformal prediction set
         & Correct predicted class \\
 
         California Housing
         & Regression
         & Point prediction with quantile interval
-        & Conformalized prediction interval
         & $|y-\hat{y}|\le\Delta$ \\
 
         Power Price
         & Day-ahead forecasting
         & 24\,h-ahead price forecast with quantile interval
-        & Rolling conformal interval
         & $|y-\hat{y}|\le\Delta$ \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
 \begin{enumerate}
-    \renewcommand{\labelenumi}{\color{blue}\arabic{enumi}.}
+    \renewcommand{\labelenumi}{\arabic{enumi}.}
     \setlength{\itemsep}{6pt}
-    \color{blue}
+    
 
     \item \textbf{StatQA.}
     StatQA~\citep{zhu2024large} evaluates the selection of relevant variables and applicable statistical methods.
@@ -582,7 +583,7 @@ The acceptance rule in the last column defines what counts as an error for the r
 \subsection{Evaluation protocol}
 \label{sec:evaluation_protocol}
 
-{\color{blue}
+
 The comparison is organised around one principle. Every release rule evaluated below consumes the same candidate pool, generated once per benchmark and stored, so methods differ only in how they decide what to publish.
 
 All experiments use three seeds. On StatQA, whose candidates are frozen language-model outputs, a seed reshuffles how the items are assigned to the four splits; on the predictive benchmarks a seed also varies model initialisation, and the pipelines are refit under each seed.
@@ -625,22 +626,22 @@ The quality of the calibrated output itself is measured by empirical coverage ag
     \label{eq:exp_coverage}
 \end{equation}
 computed over all test candidates with observed targets before any release decision is taken.
-}
+
 
 \subsection{Comparative methods}
 \label{sec:comparative_methods}
 
-{\color{blue}
+
 Eight reference methods stand against the release layer of TrustStatAgent. Selective-prediction methods rank candidates by a confidence score and reject the tail, conformal methods add distribution-free guarantees to a ranking, and end-to-end references carry no per-sample reliability signal and cannot be gated at all.
 Table~\ref{tab:comparative_methods} lists them with the release rule each one applies and its key difference from the proposed gate.
 All of them operate on the frozen candidate pools of Section~\ref{sec:evaluation_protocol}; the end-to-end references produce their own candidates, publish every one of them, and mark what a pipeline without a release layer looks like.
-}
+
 
 \begin{table}[t]
     \centering
-    \caption{\textcolor{blue}{Comparative methods. All gating methods consume the identical frozen candidates; only the release rule differs.}}
+    \caption{Comparative methods. All gating methods consume the identical frozen candidates; only the release rule differs.}
     \label{tab:comparative_methods}
-    \scriptsize\color{blue}
+    \scriptsize
     \setlength{\tabcolsep}{3pt}
     \renewcommand{\arraystretch}{1.15}
     \begin{tabularx}{\linewidth}{
@@ -708,22 +709,22 @@ All of them operate on the frozen candidate pools of Section~\ref{sec:evaluation
     \end{tabularx}
 \end{table}
 
-{\color{blue}
+
 Two relations among the baselines deserve note.
 CRC ranks candidates by the same score as selective thresholding; the two differ in how the operating point is chosen, validation tuning against risk control, so their matched-release rows coincide in Section~\ref{sec:results_matched} and any gap between them in the tables reflects threshold selection alone.
 The verbalized-confidence baseline presupposes a generated answer to self-assess and is therefore evaluated on StatQA, the benchmark whose candidates are produced by the language model; ACI is evaluated on Power Price, the benchmark with a temporal structure.
 The learned error model does not appear on StatQA because the calibrated correctness scorer of Section~\ref{sec:execution} is itself a learned error score, so the two rows would coincide by construction.
-}
+
 
 \subsection{Ablation studies}
 \label{sec:ablation_studies}
 
-{\color{blue}
+
 Three ablations examine the contribution of each module of the release layer.
 Each variant removes one component while retaining every other setting, and thresholds are not retuned to compensate for the removal, so any performance change is attributable to the removed component alone.
-}
 
-{\color{blue}
+
+
 \textbf{Without explicit planning.}
 The agent omits the structured plan but retains the same task inputs, tools, and execution budget; evaluated on StatQA under the official correctness criterion, this variant measures what the plan contributes to candidate quality.
 
@@ -733,42 +734,42 @@ This variant measures what calibration contributes to the operating point and to
 
 \textbf{Without the risk gate.}
 Calibration is retained but every candidate with a valid calibrated output is released, so the released error rate reproduces the candidate error rate and measures what the gate filters out.
-}
+
 
 \subsection{Language model configuration and computational budget}
 \label{sec:llm_configuration}
 
-{\color{blue}
+
 All language-model calls in the main experiments use GPT-6.1-sol through an OpenAI-compatible API with deterministic decoding (temperature 0.0) and a completion budget of 1{,}200 tokens; every prompt is reproduced in \ref{app:prompts} and the per-benchmark call counts in \ref{app:budget}.
-The release layer itself makes no language-model calls. Calibration is a property of the procedure and the gate is a deterministic program over execution records and calibrated outputs, so neither depends on the backbone that produced the candidates.
+The release layer itself makes no language-model calls. Calibration is a property of the procedure and the gate is a deterministic program over execution records and \textcolor{blue}{fused risk signals}, so neither depends on the backbone that produced the candidates.
 To verify that the framework transfers across backbones, Section~\ref{sec:results_multillm} repeats the main gating comparison with three further instruction-following models.
-}
+
 
 \section{Results}
 \label{sec:results}
 
-{\color{blue}
+
 We first establish that the agent does real work (Section~\ref{sec:results_autonomous}), then compare release rules at a matched release rate (Section~\ref{sec:results_release}) and across the whole risk--coverage spectrum (Section~\ref{sec:results_matched}), and finally check that each module is necessary (Section~\ref{sec:results_ablation}) and that the framework transfers across language-model backbones (Section~\ref{sec:results_multillm}).
 The raw counts behind every release figure are tabulated in \ref{app:counts}, and the four benchmarks are reported separately and never averaged, since their error scales differ by an order of magnitude.
-}
+
 
 \subsection{Autonomous planning and tool use}
 \label{sec:results_autonomous}
 
-{\color{blue}
+
 The first question is whether the agent is doing real work or decorating a fixed pipeline.
 We answer it with a four-arm study on the three predictive benchmarks, twenty tasks per benchmark.
 The \emph{fixed} arm runs a reference pipeline chosen by the authors (two tool calls, no planning).
 The \emph{autonomous} arm lets the agent inspect the data schema, select the statistical method, and compose the tool sequence itself.
 Each arm runs with and without the risk gate, and a failure-injection probe corrupts tool outputs mid-execution to test the execution checks.
 Table~\ref{tab:autonomous} reports the outcome and Figure~\ref{fig:autonomous} visualises it.
-}
+
 
 \begin{table}[t]
     \centering
-    \caption{\textcolor{blue}{Autonomous planning study, 20 tasks per benchmark, mean over three seeds. Metric: accuracy for Covertype (higher is better), MAE for California Housing and Power Price (lower is better). Blocked: intercepted failure-injection probes; the probe aborts execution upstream of the gate, so interception is identical across arms.}}
+    \caption{Autonomous planning study, 20 tasks per benchmark, mean over three seeds. Metric: accuracy for Covertype (higher is better), MAE for California Housing and Power Price (lower is better). Blocked: intercepted failure-injection probes; the probe aborts execution upstream of the gate, so interception is identical across arms.}
     \label{tab:autonomous}
-    \scriptsize\color{blue}
+    \scriptsize
     \setlength{\tabcolsep}{2.5pt}
     \renewcommand{\arraystretch}{1.15}
     \begin{tabular}{@{}llrrrrrc@{}}
@@ -801,11 +802,11 @@ Table~\ref{tab:autonomous} reports the outcome and Figure~\ref{fig:autonomous} v
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\linewidth]{figures/fig4_autonomous.pdf}
-    \caption{\textcolor{blue}{Autonomous planning versus the fixed pipeline, with and without the gate.}}
+    \caption{Autonomous planning versus the fixed pipeline, with and without the gate.}
     \label{fig:autonomous}
 \end{figure}
 
-{\color{blue}
+
 The agent's plans are executable in every run and use about four tool calls against the fixed pipeline's two; that extra work is where the quality gain comes from.
 On Covertype, autonomous method selection lifts accuracy from 0.697 to 0.887; on California Housing MAE improves from 0.326 to 0.319; on Power Price from 16.70 to 15.36.
 On StatQA the same effect appears in the planning ablation of Section~\ref{sec:results_ablation}, where removing the plan costs 2.30 points of official accuracy.
@@ -818,26 +819,26 @@ What matters for deployment is the joint outcome, and there the autonomous gated
 Finally, every planted tool failure is intercepted, ten of ten across the three benchmarks, because release requires a compliant execution record, which a corrupted tool call cannot produce.
 
 The agent therefore contributes measurable candidate quality, and the gate delivers a substantial error reduction across every benchmark and every arm.
-}
+
 
 \subsection{Release decisions at matched release}
 \label{sec:results_release}
 
-{\color{blue}
+
 The next question is whose release rule filters best when every rule must publish the same share of the same candidates. Figure~\ref{fig:main_gating} answers it at the matched 60\% release rate, the mid-spectrum point of the sweep; the exact values appear in the 60\% column of Table~\ref{tab:matched_release}.
-}
+
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=0.98\linewidth]{figures/fig2_main_gating_matrix.pdf}
-    \caption{\textcolor{blue}{Released error at the matched 60\% release rate; lower is better. Bars: seed means; error bars: seed s.d. Dashed line: publish-all error of the same candidate pool. Exact values: Table~\ref{tab:matched_release}, 60\% column.}}
+    \caption{Released error at the matched 60\% release rate; lower is better. Bars: seed means; error bars: seed s.d. Dashed line: publish-all error of the same candidate pool. Exact values: Table~\ref{tab:matched_release}, 60\% column.}
     \label{fig:main_gating}
 \end{figure}
 
-{\color{blue}
+
 On StatQA TrustStatAgent releases 60\% of candidates at 10.43\% released error, against 26.38\% for selective thresholding and 27.82\% for the model's own verbalized confidence, both significant.
 The advantage is largest exactly where single signals carry the least information about correctness.
-The gate also adapts its referral behaviour to the difficulty of the task category. It releases \textcolor{red}{86.4}\% of descriptive-statistics candidates, where the pipeline is strong, but only \textcolor{red}{35.4}\% of correlation-analysis candidates, where six in ten candidates are wrong, and the few it releases there are all correct; \ref{app:category} gives the full breakdown.
+The gate also adapts its referral behaviour to the difficulty of the task category. It releases 86.4\% of descriptive-statistics candidates, where the pipeline is strong, but only 35.4\% of correlation-analysis candidates, where six in ten candidates are wrong, and the few it releases there are all correct; \ref{app:category} gives the full breakdown.
 
 On Covertype the released error rate is 1.87\%, significantly below both conformal baselines at 2.41\% for abstention and 2.12\% for CRC, and level with the learned error model at 1.87\%. The tie is expected, since that learned error score is itself one of the signals the gate fuses; every result TrustStatAgent releases additionally carries a calibrated interval or set with a 90\% coverage guarantee.
 
@@ -852,27 +853,27 @@ Zero-shot-CoT and ReAct direct produce no per-sample reliability signal, so any 
 The comparison also exposes the reach of each rule. Verbalized confidence presupposes language-model candidates and appears only on StatQA, conformal abstention presupposes singleton prediction sets, and ACI presupposes a temporal series and appears only on Power Price, so each existing rule leaves a task family in which it defines no release decision at all.
 Only selective thresholding, the learned error model, and TrustStatAgent cover all four task families, and only TrustStatAgent adds the calibrated interval or set to every released result.
 
-}
+
 
 \subsection{The full risk--coverage spectrum}
 \label{sec:results_matched}
 
-{\color{blue}
+
 A lead at one release rate could reflect a fortunate threshold rather than a better ranking, so the next question is whether the advantage holds across the whole spectrum. Table~\ref{tab:matched_release} answers it at four matched release rates with AURC as the summary, and Figure~\ref{fig:rc_curves} draws the complete risk--coverage curves.
-}
+
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.68\linewidth]{figures/fig1_rc_curves.pdf}
-    \caption{\textcolor{blue}{Risk--coverage curves; lower is better everywhere.}}
+    \caption{Risk--coverage curves; lower is better everywhere.}
     \label{fig:rc_curves}
 \end{figure}
 
 \begin{table}[t]
     \centering
-    \caption{\textcolor{blue}{Released error (\%) at four matched release rates and AURC ($\times 10^{2}$), means over seeds; lower is better. Bold: best in column block. CRC and selective thresholding share one ranking signal, so their matched rows coincide by construction.}}
+    \caption{Released error (\%) at four matched release rates and AURC ($\times 10^{2}$), means over seeds; lower is better. Bold: best in column block. CRC and selective thresholding share one ranking signal, so their matched rows coincide by construction.}
     \label{tab:matched_release}
-    \scriptsize\color{blue}
+    \scriptsize
     \setlength{\tabcolsep}{4pt}
     \renewcommand{\arraystretch}{1.12}
     \begin{tabular}{@{}llrrrrr@{}}
@@ -908,10 +909,10 @@ A lead at one release rate could reflect a fortunate threshold rather than a bet
 \end{table}
 
 
-{\color{blue}
+
 The spectrum confirms that the single-point results are structural.
 TrustStatAgent attains the lowest AURC on StatQA at 14.44 against 19.74 and 29.95 for the two baselines, on Power Price at 7.09 against 9.01 or higher for every baseline, and on California Housing at 0.87; on Covertype its AURC is statistically indistinguishable from the learned error model's, both at 2.45, and ahead of every conformal baseline.
-On StatQA TrustStatAgent is significantly ahead of both baselines at the \textcolor{red}{40\% and 60\%} release rates.
+On StatQA TrustStatAgent is significantly ahead of both baselines at the 40\% and 60\% release rates.
 On Power Price it is significantly ahead of all four baselines at 40\%, 60\%, and 80\%; the only point it does not win is the most conservative 20\% corner, where the width-based rules benefit from a handful of extreme forecasts with enormous intervals.
 On Covertype it is significantly ahead of the conformal family at all four rates and level with the learned error model throughout.
 On California Housing the candidate pool is already so accurate that too few errors remain for any ranking to separate the methods, and we report parity. Section~\ref{sec:results_discussion} turns this floor into a precise statement about when fusion can and cannot add value.
@@ -919,27 +920,27 @@ On California Housing the candidate pool is already so accurate that too few err
 Two features of the curves deserve a direct look.
 Verbalized confidence starts competitively on StatQA at 6.45\% released error at the 20\% rate and then collapses to 27.82\% at the 60\% rate. The model knows which of its answers are obviously right but cannot rank the middle of the distribution, which is where a deployment actually operates.
 And on Power Price the TrustStatAgent curve is nearly flat between the 40\% and 80\% rates, moving only from 7.05\% to 7.51\%, while every single-signal curve deteriorates, because the rolling-residual and width signals fire on different failure modes and the fusion inherits both.
-}
+
 
 \subsection{Ablation results}
 \label{sec:results_ablation}
 
-{\color{blue}
+
 The next question is whether all three modules earn their place or whether one of them does all the work. Table~\ref{tab:ablation_results} removes one module at a time, and Figure~\ref{fig:ablation} summarises the outcome.
-}
+
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.74\linewidth]{figures/fig3_ablation.pdf}
-    \caption{\textcolor{blue}{Ablation summary. The gate owns the error reduction, calibration owns the certificate, planning owns candidate quality.}}
+    \caption{Ablation summary. The gate owns the error reduction, calibration owns the certificate, planning owns candidate quality.}
     \label{fig:ablation}
 \end{figure}
 
 \begin{table}[t]
     \centering
-    \caption{\textcolor{blue}{Ablations at each variant's natural operating point, mean over seeds. Coverage targets 90\%; StatQA targets no coverage level (---). The planning ablation reports StatQA official accuracy.}}
+    \caption{Ablations at each variant's natural operating point, mean over seeds. Coverage targets 90\%; StatQA targets no coverage level (---). The planning ablation reports StatQA official accuracy.}
     \label{tab:ablation_results}
-    \scriptsize\color{blue}
+    \scriptsize
     \setlength{\tabcolsep}{4pt}
     \renewcommand{\arraystretch}{1.12}
     \begin{tabular}{@{}llrrr@{}}
@@ -949,7 +950,7 @@ The next question is whether all three modules earn their place or whether one o
         \multirow{3}{*}{StatQA}
         & w/o risk gate              & ---   & 100.00 & 43.03 \\
         & w/o conformal calibration  & ---   &  53.88 &  8.70 \\
-        & \textbf{Full model}        & ---   &  \textcolor{red}{58.98} &  \textcolor{red}{10.13} \\
+        & \textbf{Full model}        & ---   &  58.98 &  10.13 \\
         \midrule
         \multirow{3}{*}{Covertype}
         & w/o risk gate              & 90.16 & 100.00 & 11.23 \\
@@ -974,32 +975,32 @@ The next question is whether all three modules earn their place or whether one o
 \end{table}
 
 
-{\color{blue}
+
 Removing the gate releases every candidate, and the released error rate returns to the candidate error rate of 43.03\% on StatQA, 11.23\% on Covertype, 3.36\% on California Housing, and 10.46\% on Power Price. The entire error reduction of the framework comes from the release decision, none from hiding candidates.
 
 Removing calibration leaves the ranking of candidates in place and therefore leaves the released error rate nearly unchanged at the natural operating point, but it destroys the certificate the framework exists to provide.
 Coverage drifts off its nominal 90\% level in both directions, down to 80.78\% on California Housing and up to 95.08\% on Power Price, so the user no longer knows how much trust to place in an interval.
-\textcolor{red}{On StatQA the two variants release at similar rates, 58.98\% against 53.88\%, and err within seed noise of each other, 10.13\% against 8.70\%; what calibration adds is again the certificate, with the prediction sets covering 86.1\% of cases against 57.0\% for the uncalibrated variant.}
+On StatQA the two variants release at similar rates, 58.98\% against 53.88\%, and err within seed noise of each other, 10.13\% against 8.70\%; what calibration adds is again the certificate, with the prediction sets covering 86.1\% of cases against 57.0\% for the uncalibrated variant.
 
 Removing explicit planning leaves the release layer untouched and damages the input instead. StatQA accuracy falls from 56.97\% to 54.67\%, which confirms that the plan is part of what determines candidate quality, as the autonomous study of Section~\ref{sec:results_autonomous} showed from the other direction.
 
 The three results together exclude the simplest alternative explanation of Figure~\ref{fig:main_gating}, namely that one component does all the work. The gate owns the error reduction, calibration owns the certificate, and planning owns candidate quality.
-}
+
 
 \subsection{Generality across language-model backbones}
 \label{sec:results_multillm}
 
-{\color{blue}
-The main experiments use GPT-6.1-sol. To check that \textcolor{red}{the framework} transfers across backbones, we repeat the StatQA comparison with three further models from different providers and families --- Qwen3.7-Max (Alibaba), GLM-5.3 (Zhipu AI), and Grok-4.7 (xAI) --- under an identical protocol. StatQA is the natural test bed for this check, as the only benchmark whose candidates are written by the language model itself; on the predictive benchmarks the candidates come from statistical tools, so a backbone swap changes little there. Calibration and gating make no language-model calls, so only the candidate pools differ; backbone execution failures are intercepted as non-release, and all rates are computed on the valid candidates.
 
-\textcolor{red}{Table~\ref{tab:multillm} shows that the gain transfers to every backbone: at the 60\% release target the gate errs at 10.1--23.5\%, against 43.0--53.9\% for publishing every candidate and 25.2--31.7\% for the strongest baseline, and below selective thresholding at \textcolor{red}{45 of the 48 combinations of backbone, split seed, and release rate and never above it} (Figure~\ref{fig:multillm}).}
-}
+The main experiments use GPT-6.1-sol. To check that the framework transfers across backbones, we repeat the StatQA comparison with three further models from different providers and families --- Qwen3.7-Max (Alibaba), GLM-5.3 (Zhipu AI), and Grok-4.7 (xAI) --- under an identical protocol. StatQA is the natural test bed for this check, as the only benchmark whose candidates are written by the language model itself; on the predictive benchmarks the candidates come from statistical tools, so a backbone swap changes little there. Calibration and gating make no language-model calls, so only the candidate pools differ; backbone execution failures are intercepted as non-release, and all rates are computed on the valid candidates.
+
+Table~\ref{tab:multillm} shows that the gain transfers to every backbone: at the 60\% release target the gate errs at 10.1--23.5\%, against 43.0--53.9\% for publishing every candidate and 25.2--31.7\% for the strongest baseline, and below selective thresholding at 45 of the 48 combinations of backbone, split seed, and release rate and never above it (Figure~\ref{fig:multillm}).
+
 
 \begin{table}[t]
     \centering
-    \caption{\textcolor{blue}{Cross-backbone results on StatQA at the 60\% release target (mean over three seeds); lower is better. \textcolor{red}{``Best base.'': the stronger of selective thresholding and verbalized confidence at the matched release rate.}}}
+    \caption{Cross-backbone results on StatQA at the 60\% release target (mean over three seeds); lower is better. ``Best base.'': the stronger of selective thresholding and verbalized confidence at the matched release rate.}
     \label{tab:multillm}
-    \scriptsize\color{blue}
+    \scriptsize
     \setlength{\tabcolsep}{3.5pt}
     \renewcommand{\arraystretch}{1.15}
     \resizebox{\linewidth}{!}{%
@@ -1008,10 +1009,10 @@ The main experiments use GPT-6.1-sol. To check that \textcolor{red}{the framewor
         \textbf{Backbone} & \textbf{Acc.\ (trust)} & \textbf{Acc.\ (ZS-CoT)} & \textbf{No-gate err.} & \textbf{Gated err.} & \textbf{Release} & \textbf{Best base.} \\
         & (\%) & (\%) & (\%) & (\%) & (\%) & (\%) \\
         \midrule
-        GPT-6.1-sol & 57.0 & \textcolor{red}{67.8} & 43.0 & \textcolor{red}{\textbf{10.1}} & \textcolor{red}{59.0} & 26.4 \\
-        Qwen3.7-Max & 46.1 & 57.8 & 53.9 & \textcolor{red}{\textbf{23.5}} & \textcolor{red}{58.8} & 31.7 \\
-        GLM-5.3     & 49.6 & \textcolor{red}{55.5} & 50.4 & \textcolor{red}{\textbf{21.1}} & \textcolor{red}{59.2} & 28.5 \\
-        Grok-4.7    & 49.9 & \textcolor{red}{65.1} & 50.1 & \textcolor{red}{\textbf{20.8}} & \textcolor{red}{61.1} & 25.2 \\
+        GPT-6.1-sol & 57.0 & 67.8 & 43.0 & \textbf{10.1} & 59.0 & 26.4 \\
+        Qwen3.7-Max & 46.1 & 57.8 & 53.9 & \textbf{23.5} & 58.8 & 31.7 \\
+        GLM-5.3     & 49.6 & 55.5 & 50.4 & \textbf{21.1} & 59.2 & 28.5 \\
+        Grok-4.7    & 49.9 & 65.1 & 50.1 & \textbf{20.8} & 61.1 & 25.2 \\
         \bottomrule
     \end{tabular}}
 \end{table}
@@ -1019,19 +1020,19 @@ The main experiments use GPT-6.1-sol. To check that \textcolor{red}{the framewor
 \begin{figure}[!tb]
     \centering
     \includegraphics[width=0.9\linewidth]{figures/fig5_multillm.pdf}
-    \caption{\textcolor{red}{Risk--coverage curves on StatQA across the four backbones (mean over three seeds; shading: s.d.). Dashed line: the 60\% release target reported in Table~\ref{tab:multillm}.}}
+    \caption{Risk--coverage curves on StatQA across the four backbones (mean over three seeds; shading: s.d.). Dashed line: the 60\% release target reported in Table~\ref{tab:multillm}.}
     \label{fig:multillm}
 \end{figure}
 
 \section{Discussion}
 \label{sec:results_discussion}
 
-{\color{blue}
+
 Sections~\ref{sec:results_release} and~\ref{sec:results_matched} read the results one benchmark at a time; reading them together answers two questions, when fusing several signals beats the best single one, and what the release layer costs to operate.
 The first question is about our own design: the risk gate ranks candidates by fusing several calibrated signals, interval width, a learned error score, rolling residuals, and answer agreement, while every compared baseline ranks by a single one.
 
 \begin{enumerate}
-    \renewcommand{\labelenumi}{\color{blue}\arabic{enumi}.}
+    \renewcommand{\labelenumi}{\arabic{enumi}.}
     \setlength{\itemsep}{5pt}
 
     \item \textbf{Fusion pays exactly when candidate errors scatter across signals.}
@@ -1041,21 +1042,21 @@ The first question is about our own design: the risk gate ranks candidates by fu
     A deployment can diagnose its own regime on validation data in advance, by checking whether its candidate errors concentrate under one signal or scatter across several.
 
     \item \textbf{The exchange is affordable under modest cost assumptions.}
-    Writing $c_e$ for the cost of a published violation and $c_r$ for the cost of one referral, the expected cost per candidate is proportional to $\rho\,r\,e+(1-r)$ with $\rho=c_e/c_r$, and the gated policy beats publishing everything once $\rho$ exceeds $\rho^{\ast}=(1-r)/(p-r\,e)$: \textcolor{red}{1.1} on StatQA, 4.0 on Covertype, 6.1 on Power Price, and 13.7 on California Housing (Fig.~\ref{fig:cost_ratio}).
+    Writing $c_e$ for the cost of a published violation and $c_r$ for the cost of one referral, the expected cost per candidate is proportional to $\rho\,r\,e+(1-r)$ with $\rho=c_e/c_r$, and the gated policy beats publishing everything once $\rho$ exceeds $\rho^{\ast}=(1-r)/(p-r\,e)$: 1.1 on StatQA, 4.0 on Covertype, 6.1 on Power Price, and 13.7 on California Housing (Fig.~\ref{fig:cost_ratio}).
     Where violations are common, a published error need only cost a few times a referral for the gate to pay for itself; where they are rare the argument requires an order of magnitude more, because most referrals are then unnecessary.
-    The referral load an operator would size review capacity against is \textcolor{red}{41.0}\% of candidates on StatQA, 40.0\% on Covertype, 39.4\% on California Housing, and 39.0\% on Power Price.
+    The referral load an operator would size review capacity against is 41.0\% of candidates on StatQA, 40.0\% on Covertype, 39.4\% on California Housing, and 39.0\% on Power Price.
 \end{enumerate}
 
 Two further observations merit emphasis.
-Our agent earns its place exactly where the fixed pipeline is wrong, lifting Covertype accuracy from 0.697 to 0.887 by replacing the author-chosen logistic regression, and our gate removes 58\% to 83\% of the released error \textcolor{red}{across the autonomous arms}.
+Our agent earns its place exactly where the fixed pipeline is wrong, lifting Covertype accuracy from 0.697 to 0.887 by replacing the author-chosen logistic regression, and our gate removes 58\% to 83\% of the released error across the autonomous arms.
 In our design the release decision belongs to a deterministic program rather than to the model's self-report. The program's inputs are inspectable, and because our calibration never touches the generator, our release layer transfers unchanged across backbones (Section~\ref{sec:results_multillm}).
-Against selective-prediction and conformal language-modelling work~\citep{geifman2017selective,elyaniv2010foundations,lee2024selective,quach2024conformal,wang2024conu,cherian2024large}, our difference lies in what is calibrated, a computational result whose execution is also checked, so our rule covers all four task families whereas every compared rule leaves at least one family undefined.
-}
+Against selective-prediction and conformal language-modelling work~\citep{geifman2017selective,elyaniv2010foundations,lee2024selective,quach2024conformal,wang2024conu,cherian2024large}, our difference lies in what is calibrated, a computational result whose execution is also checked, so \textcolor{blue}{our rule covers all four task families with a certificate attached, whereas the rules that reach the same coverage carry no certificate and the remaining rules each leave at least one family undefined.}
+
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=0.72\linewidth]{figures/fig_cost_ratio.pdf}
-    \caption{\textcolor{blue}{Relative expected cost of the gated policy against publishing everything as a function of the cost ratio $\rho=c_e/c_r$ (logarithmic axis); $r$ and $e$ from Table~\ref{tab:ablation_results}, $p$ the candidate error rate. Circles mark the break-even ratios quoted in the text.}}
+    \caption{Relative expected cost of the gated policy against publishing everything as a function of the cost ratio $\rho=c_e/c_r$ (logarithmic axis); $r$ and $e$ from Table~\ref{tab:ablation_results}, $p$ the candidate error rate. Circles mark the break-even ratios quoted in the text.}
     \label{fig:cost_ratio}
 \end{figure}
 
@@ -1063,25 +1064,25 @@ Against selective-prediction and conformal language-modelling work~\citep{geifma
 \section{Conclusion}
 \label{sec:conclusion}
 
-{\color{blue}
+
 This paper addressed the point at which a statistical agent stops producing a result and starts publishing one.
 The difficulty lies outside computation, since a tool can fit a model and a language model can plan which model to fit.
 An uncalibrated confidence score gives no finite-sample basis for deciding whether a particular result is safe to release, and a reliability criterion taken alone can be satisfied by publishing nothing.
 We therefore treated statistical accuracy and publishing reliability as a joint objective and proposed TrustStatAgent.
-A tool-restricted LLM agent produces candidates, conformal calibration attaches a coverage statement to each candidate, and a deterministic risk gate releases only those results whose execution is compliant and whose calibrated output lies inside the task's acceptance region.
+A tool-restricted LLM agent produces candidates, conformal calibration attaches a coverage statement to each candidate, and a deterministic risk gate releases only those results whose execution is compliant and whose \textcolor{blue}{fused calibrated risk score clears the release threshold}.
 Release authority is separated from generation, so the model that produces a number does not decide whether the number is published.
 
 The experiments support the design on four benchmarks.
 Left to plan for itself, the agent selects methods that beat a fixed reference pipeline, most sharply on Covertype, where accuracy rises from 0.697 to 0.887, and a failure-injection probe confirms that every corrupted tool call is intercepted before release.
-Against publishing every candidate from the same pipeline, the gate reduces the released error rate from 43.03\% to \textcolor{red}{10.13}\% on StatQA, from 11.23\% to 1.86\% on Covertype, from 3.36\% to 0.80\% on California Housing, and from 10.46\% to 6.66\% on Power Price, at release rates of \textcolor{red}{59}\% to 61\%.
+Against publishing every candidate from the same pipeline, the gate reduces the released error rate from 43.03\% to 10.13\% on StatQA, from 11.23\% to 1.86\% on Covertype, from 3.36\% to 0.80\% on California Housing, and from 10.46\% to 6.66\% on Power Price, at release rates of 59\% to 61\%.
 Compared at identical release rates, TrustStatAgent attains a risk--coverage area that is the lowest or statistically indistinguishable from the lowest on every benchmark, and every released result additionally carries a 90\% coverage certificate that the single-signal rules do not provide.
-The ablations assign each module its own job, the gate the error reduction, calibration the certificate, and planning the candidate quality, and the release layer itself makes no language-model calls and transfers unchanged across three further model families, where it cuts the released error of the noisiest candidate pool from 53.9\% to \textcolor{red}{23.5}\%.
+The ablations assign each module its own job, the gate the error reduction, calibration the certificate, and planning the candidate quality, and the release layer itself makes no language-model calls and transfers unchanged across three further model families, where it cuts the released error of the noisiest candidate pool from 53.9\% to 23.5\%.
 
 Three extensions follow.
 First, the exchangeability assumption should be replaced by online calibration for the forecasting task and by stratified calibration for heterogeneous item pools, so that the guarantee applies to the units on which the decision is actually taken.
 Second, the operating point should follow from a stated cost ratio rather than a fixed tolerance, and the referral should distinguish degrees of review beyond the present two levels.
 Third, the workflow should be tested on tasks whose correctness depends on several modelling decisions at once, such as model diagnostics and multiple-testing corrections, where the acceptance region is harder to specify than an error band but where the same separation between generation and release applies.
-}
+
 
 
 \section*{CRediT authorship contribution statement}
@@ -1135,26 +1136,26 @@ with a project page at \url{https://yifei-create.github.io/TrustStatAgent/}.
 
 
 
-{\color{blue}
+
 Table~\ref{tab:raw_counts} reports the raw integer counts behind the release statistics of Sections~\ref{sec:results_release} and~\ref{sec:results_ablation}, following the convention of Table~\ref{tab:exp_release_confusion}: an actual error is the positive class and referral for review is the positive decision, so TP denotes an intercepted error, FN a released error, TN a correct result released, and FP a correct result withheld.
 The counts correspond to the reference seed 42 at each policy's natural operating point; the matched-release comparisons of Sections~\ref{sec:results_release} and~\ref{sec:results_matched} re-rank the same candidates, and the per-seed counts are included in the code repository.
 The true labels enter only after every release decision has been fixed, to score the decisions; they are never available to the gate itself.
-}
+
 
 \begin{table}[!tb]
     \centering
-    \caption{\textcolor{blue}{Raw confusion counts on the test partitions at the reference seed, each policy at its natural operating point. StatQA has 464 test items, Covertype 20{,}000, California Housing 4{,}128, and Power Price 5{,}200.}}
+    \caption{Raw confusion counts on the test partitions at the reference seed, each policy at its natural operating point. StatQA has 464 test items, Covertype 20{,}000, California Housing 4{,}128, and Power Price 5{,}200.}
     \label{tab:raw_counts}
-    \footnotesize\color{blue}
+    \footnotesize
     \setlength{\tabcolsep}{7pt}
     \renewcommand{\arraystretch}{1.12}
     \begin{tabular}{@{}llrrrr@{}}
         \toprule
         \textbf{Benchmark} & \textbf{Policy} & \textbf{TP} & \textbf{FN} & \textbf{TN} & \textbf{FP} \\
         \midrule
-        StatQA & TrustStatAgent & \textcolor{red}{172} & \textcolor{red}{30} & \textcolor{red}{228} & \textcolor{red}{34} \\
-               & Selective threshold & \textcolor{red}{104} & \textcolor{red}{98} & \textcolor{red}{235} & \textcolor{red}{27} \\
-               & Verbalized confidence & \textcolor{red}{125} & \textcolor{red}{77} & \textcolor{red}{203} & \textcolor{red}{59} \\
+        StatQA & TrustStatAgent & 172 & 30 & 228 & 34 \\
+               & Selective threshold & 104 & 98 & 235 & 27 \\
+               & Verbalized confidence & 125 & 77 & 203 & 59 \\
                & w/o conformal calibration & 177 & 25 & 219 & 43 \\
                & w/o risk gate & 0 & 202 & 262 & 0 \\
                & ReAct direct & 0 & 216 & 248 & 0 \\
@@ -1180,22 +1181,22 @@ The true labels enter only after every release decision has been fixed, to score
     \end{tabular}
 \end{table}
 
-{\color{blue}
+
 Two features of the table are worth reading directly.
 On Power Price, selective thresholding and conformal risk control rank candidates by the same signal yet land on opposite ends of the automation scale, releasing 88.1\% of candidates at 11.4\% released error and 11.8\% at 4.9\%; the matched-release protocol of Section~\ref{sec:evaluation_protocol} exists precisely to remove this threshold arbitrariness from the comparison.
-\textcolor{red}{On StatQA the verbalized-confidence gate releases 60.3\% of candidates at its natural operating point and errs at 27.5\%, essentially its matched-release row; its failure is therefore ranking quality rather than timidity.}
+On StatQA the verbalized-confidence gate releases 60.3\% of candidates at its natural operating point and errs at 27.5\%, essentially its matched-release row; its failure is therefore ranking quality rather than timidity.
 Removing calibration leaves the released set untouched on California Housing and Power Price, identical TP, FN, TN, and FP rows to the full model, and only moves empirical coverage off its nominal level, so those rows are omitted.
 The StatQA counts of CRC are omitted on the same ground of redundancy: its matched-release rows coincide with selective thresholding by construction (Section~\ref{sec:comparative_methods}), and its natural operating point would add only the cross-operating-point comparison that the matched-release protocol exists to remove.
 The Power Price CRC row is retained because there the contrast between two natural operating points of one shared ranking is itself the evidence for the protocol.
-}
+
 
 \section{Prompts}
 \label{app:prompts}
 
-{\color{blue}
+
 All calls use the configuration of Section~\ref{sec:llm_configuration}.
 The system prompt of the planning agent is reproduced verbatim below; it is identical across the four benchmarks, and the per-benchmark task constraints that accompany it in the user prompt follow in the second box.
-}
+
 
 \begin{promptbox}{System prompt, planning agent}
 You are the TrustStat statistical analysis agent. You plan and execute
@@ -1248,9 +1249,9 @@ or updating the plan), tool (name or null), arguments (object), candidate
 required with candidate).
 \end{promptbox}
 
-{\color{blue}
+
 The user prompt is a JSON object containing the task specification, the authorized data identifiers, the allowed tools with their contracts, the accumulated tool observations, and a task-constraints block that pins the target and method whitelist of each benchmark.
-}
+
 
 \begin{promptbox}{Task constraints, per benchmark}
 \textbf{\textrm{California Housing:}} Set target exactly to MedHouseVal and method exactly to
@@ -1274,11 +1275,11 @@ allowed. Base method choice on the verified column statistics (types,
 missingness, expected cell counts, correlation).
 \end{promptbox}
 
-{\color{blue}
+
 The baseline and ablation variants replace only the system prompt and leave the task inputs and the tool budget unchanged.
 The verbalized-confidence baseline requires no separate elicitation: it reads the confidence value that Step 5 of the system prompt already returns with every candidate.
 The correctness scorer used for calibration on StatQA is a TF--IDF logistic regression (Section~\ref{sec:execution}) and involves no language-model call.
-}
+
 
 \begin{promptbox}{Baseline and ablation system prompts}
 ReAct direct: Use an interleaved Thought--Action--Observation protocol.
@@ -1293,39 +1294,39 @@ Zero-shot-CoT: Think step by step and answer in JSON. Do not call tools.
 \section{Computational budget}
 \label{app:budget}
 
-{\color{blue}
+
 The data partitioning of every benchmark is given in Section~\ref{sec:benchmark_tasks}.
 The language-model budget of the full evaluation is modest.
 On StatQA, four candidate pipelines (TrustStatAgent, ReAct direct, Zero-shot-CoT, and the without-planning ablation) each process the 1{,}163 items; TrustStatAgent and ReAct run as multi-step loops capped at eight calls per item, while the verbalized-confidence baseline reuses the self-assessment returned with each candidate and adds no calls.
 The autonomous study of Section~\ref{sec:results_autonomous} runs 20 tasks per benchmark and seed with two planning arms, 360 agent runs in total averaging about four calls each; the fixed arms make no language-model calls.
 The cross-backbone study repeats one TrustStatAgent pass and one Zero-shot-CoT pass per additional backbone over the same 1{,}163 StatQA items.
 All remaining computation is performed by the fixed statistical pipelines and involves no language-model calls.
-}
+
 
 \section{Per-category behaviour on StatQA}
 \label{app:category}
 
-{\color{blue}
+
 Table~\ref{tab:statqa_categories} decomposes the StatQA results of Section~\ref{sec:results_release} by task category, pooled over the three split seeds.
-\textcolor{red}{The gate releases over 80\% of candidates in the two strongest categories and refers the majority of the three hardest ones, where the released error rate stays below 1\% in two of them.}
-}
+The gate releases over 80\% of candidates in the two strongest categories and refers the majority of the three hardest ones, where the released error rate stays below 1\% in two of them.
+
 
 \begin{table}[H]
     \centering
-    \caption{\textcolor{blue}{Per-category behaviour of TrustStatAgent on the StatQA test partitions, pooled over the three split seeds (1{,}392 items). Released error rate is computed within the released subset of each category.}}
+    \caption{Per-category behaviour of TrustStatAgent on the StatQA test partitions, pooled over the three split seeds (1{,}392 items). Released error rate is computed within the released subset of each category.}
     \label{tab:statqa_categories}
-    \small\color{blue}
+    \small
     \setlength{\tabcolsep}{7pt}
     \renewcommand{\arraystretch}{1.15}
     \begin{tabular}{@{}lrrrr@{}}
         \toprule
         \textbf{Task category} & \textbf{$n$} & \textbf{Acc. (\%)} & \textbf{Rel. (\%)} & \textbf{Rel. err. (\%)} \\
         \midrule
-        Contingency Table Test & 309 & 70.6 & \textcolor{red}{82.5} & \textcolor{red}{17.6} \\
-        Correlation Analysis & 198 & 40.4 & \textcolor{red}{35.4} & \textcolor{red}{0.0} \\
-        Descriptive Statistics & 309 & 81.6 & \textcolor{red}{86.4} & \textcolor{red}{5.6} \\
-        Distribution Compliance Test & 285 & 39.6 & \textcolor{red}{40.0} & \textcolor{red}{0.9} \\
-        Variance Test & 291 & 44.7 & \textcolor{red}{37.1} & \textcolor{red}{14.8} \\
+        Contingency Table Test & 309 & 70.6 & 82.5 & 17.6 \\
+        Correlation Analysis & 198 & 40.4 & 35.4 & 0.0 \\
+        Descriptive Statistics & 309 & 81.6 & 86.4 & 5.6 \\
+        Distribution Compliance Test & 285 & 39.6 & 40.0 & 0.9 \\
+        Variance Test & 291 & 44.7 & 37.1 & 14.8 \\
         \bottomrule
     \end{tabular}
 \end{table}
